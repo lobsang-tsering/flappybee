@@ -63,11 +63,11 @@ flutter:
   uses-material-design: true
 
   assets:
-    - assets/audio/swoosh.wav
-    - assets/audio/die.wav
-    - assets/audio/point.wav
-    - assets/audio/wing.wav
-    - assets/audio/hit.wav
+    - assets/audio/swoosh.ogg
+    - assets/audio/die.ogg
+    - assets/audio/point.ogg
+    - assets/audio/wing.ogg
+    - assets/audio/hit.ogg
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

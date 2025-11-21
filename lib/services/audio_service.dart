@@ -1,112 +1,56 @@
 import 'dart:async';
-import 'dart:math';
-import 'dart:typed_data';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
+import 'package:audioplayers/audioplayers.dart';
 
 class AudioService {
-  // Independent players
-  static final AudioPlayer _playerJump = AudioPlayer();
-  static final AudioPlayer _playerScore = AudioPlayer();
-  static final AudioPlayer _playerCrash = AudioPlayer();
+  // A dedicated player for each sound effect to prevent them from cutting each other off.
+  static final AudioPlayer _playerScore = AudioPlayer()
+    ..setReleaseMode(ReleaseMode.stop);
+  static final AudioPlayer _playerHit = AudioPlayer()
+    ..setReleaseMode(ReleaseMode.stop);
+  static final AudioPlayer _playerDie = AudioPlayer()
+    ..setReleaseMode(ReleaseMode.stop);
+  static final AudioPlayer _playerSwoosh = AudioPlayer()
+    ..setReleaseMode(ReleaseMode.stop);
 
   static bool _initialized = false;
   static bool _isMuted = false;
 
-  // Audio Data
-  static Uint8List? _jumpBytes;
-  static Uint8List? _scoreBytes;
-  static Uint8List? _crashBytes;
-  static Uint8List? _swooshBytes;
+  // Asset sources pointing to the correct .ogg files.
+  static final AssetSource _jumpSource = AssetSource('audio/wing.ogg');
+  static final AssetSource _scoreSource = AssetSource('audio/point.ogg');
+  static final AssetSource _hitSource = AssetSource('audio/hit.ogg'); // The impact sound
+  static final AssetSource _dieSource = AssetSource('audio/die.ogg'); // The fall/end sound
+  static final AssetSource _swooshSource = AssetSource('audio/swoosh.ogg');
 
   static Future<void> init() async {
     if (_initialized) return;
-
-    debugPrint("AudioService: Generating 8-bit sounds...");
-
-    // 1. Synthesize Sounds
-    // Jump: Square wave slide (Mario jump style)
-    _jumpBytes = _generateWav(
-      type: 'square',
-      startFreq: 150,
-      endFreq: 300,
-      duration: 0.1,
-      volume: 0.3,
-    );
-
-    // Score: CUSTOM COIN SOUND (B5 -> E6 Arpeggio)
-    _scoreBytes = _generateCoinWav();
-
-    // Crash: Low pitch noise/sawtooth
-    _crashBytes = _generateWav(
-      type: 'sawtooth',
-      startFreq: 150,
-      endFreq: 50,
-      duration: 0.3,
-      volume: 0.4,
-    );
-
-    // Swoosh: High pitch slide
-    _swooshBytes = _generateWav(
-      type: 'square',
-      startFreq: 600,
-      endFreq: 1200,
-      duration: 0.2,
-      volume: 0.2,
-    );
-
-    // 2. Prepare Players
-    try {
-      await _playerJump.setSource(BytesSource(_jumpBytes!));
-      await _playerJump.setReleaseMode(ReleaseMode.stop);
-
-      await _playerScore.setSource(BytesSource(_scoreBytes!));
-      await _playerScore.setReleaseMode(ReleaseMode.stop);
-
-      await _playerCrash.setSource(BytesSource(_crashBytes!));
-      await _playerCrash.setReleaseMode(ReleaseMode.stop);
-    } catch (e) {
-      debugPrint("AudioService init error: $e");
-    }
-
+    debugPrint("AudioService: Initialized for asset playback.");
     _initialized = true;
   }
 
-  // --- Playback Methods ---
-
+  /// For short, overlapping sounds like jumping, we create a new player instance each time.
+  /// This allows multiple sounds to play simultaneously.
   static void playJump() {
-    if (!_initialized || _isMuted) return;
-    _safePlay(_playerJump, _jumpBytes!);
+    if (_isMuted) return;
+    // Create a new player instance that will be disposed of automatically after playing.
+    final player = AudioPlayer()..setReleaseMode(ReleaseMode.release);
+    player.play(_jumpSource);
   }
 
-  static void playScore() {
-    if (!_initialized || _isMuted) return;
-    _safePlay(_playerScore, _scoreBytes!);
-  }
-
+  static void playScore() => _play(_playerScore, _scoreSource);
   static void playCoin() => playScore();
+  static void playSwoosh() => _play(_playerSwoosh, _swooshSource);
+  static void playHit() => _play(_playerHit, _hitSource);
+  static void playCrash() => _play(_playerDie, _dieSource);
 
-  static void playCrash() {
+  static void _play(AudioPlayer player, AssetSource source) {
     if (!_initialized || _isMuted) return;
-    _safePlay(_playerCrash, _crashBytes!);
-  }
-
-  static void playHit() => playCrash();
-
-  static void playCelebration() {
-    if (!_initialized || _isMuted) return;
-    _playerScore.play(BytesSource(_swooshBytes!));
-  }
-
-  static void _safePlay(AudioPlayer player, Uint8List bytes) {
-    try {
-      if (player.state == PlayerState.playing) {
-        player.stop();
-      }
-      player.play(BytesSource(bytes));
-    } catch (e) {
-      debugPrint("Audio error: $e");
-    }
+    // We don't need to stop the player before playing a new sound
+    // because each of these sounds has its own dedicated player.
+    // This is good for distinct sounds, but not for rapid-fire sounds
+    // that should overlap, like the jump sound.
+    player.play(source);
   }
 
   // --- Mute / Dispose ---
@@ -114,9 +58,10 @@ class AudioService {
   static void toggleMute() {
     _isMuted = !_isMuted;
     if (_isMuted) {
-      _playerJump.stop();
       _playerScore.stop();
-      _playerCrash.stop();
+      _playerHit.stop();
+      _playerDie.stop();
+      _playerSwoosh.stop();
     }
   }
 
@@ -124,127 +69,10 @@ class AudioService {
   static void setMuted(bool muted) => _isMuted = muted;
 
   static Future<void> dispose() async {
-    await _playerJump.dispose();
     await _playerScore.dispose();
-    await _playerCrash.dispose();
+    await _playerHit.dispose();
+    await _playerDie.dispose();
+    await _playerSwoosh.dispose();
     _initialized = false;
-  }
-
-  // --- SPECIAL COIN GENERATOR ---
-  // Generates a two-tone "Bling" sound (B5 -> E6)
-  static Uint8List _generateCoinWav() {
-    const int sampleRate = 44100;
-    final List<int> pcmData = [];
-
-    // Tone 1: B5 (987.77 Hz) for 0.06 seconds
-    _addTone(pcmData, sampleRate, 988.0, 0.06, 0.4);
-
-    // Tone 2: E6 (1318.51 Hz) for 0.30 seconds (Decaying)
-    _addTone(pcmData, sampleRate, 1319.0, 0.30, 0.4, decay: true);
-
-    return _finalizeWav(pcmData, sampleRate);
-  }
-
-  // Helper to add a specific frequency to the PCM buffer
-  static void _addTone(
-    List<int> buffer,
-    int sampleRate,
-    double freq,
-    double duration,
-    double volume, {
-    bool decay = false,
-  }) {
-    final int numSamples = (duration * sampleRate).toInt();
-    for (int i = 0; i < numSamples; i++) {
-      final double t = i / numSamples;
-      final double cycle = sampleRate / freq;
-      final double val = 2 * pi * (i / cycle);
-
-      // Square Wave (Classic 8-bit sound)
-      double sample = sin(val) > 0 ? 1.0 : -1.0;
-
-      // Apply Volume
-      double amp = volume;
-
-      // Apply Decay (fade out) if requested
-      if (decay) {
-        amp *= (1.0 - t);
-      }
-
-      int intSample = ((sample * amp + 1.0) * 127.5).toInt();
-      buffer.add(intSample.clamp(0, 255));
-    }
-  }
-
-  // --- GENERIC GENERATOR (Jump/Crash) ---
-  static Uint8List _generateWav({
-    required String type,
-    required double startFreq,
-    required double endFreq,
-    required double duration,
-    required double volume,
-  }) {
-    const int sampleRate = 44100;
-    final List<int> pcmData = [];
-    final int numSamples = (duration * sampleRate).toInt();
-
-    for (int i = 0; i < numSamples; i++) {
-      final double t = i / numSamples;
-      final double currentFreq = startFreq + (endFreq - startFreq) * t;
-
-      double amp = volume;
-      if (t < 0.1) amp *= (t / 0.1); // Attack
-      if (t > 0.8) amp *= ((1.0 - t) / 0.2); // Release
-
-      final double cycle = sampleRate / currentFreq;
-      final double val = 2 * pi * (i / cycle);
-
-      double sample = 0;
-      if (type == 'sine')
-        sample = sin(val);
-      else if (type == 'square')
-        sample = sin(val) > 0 ? 1.0 : -1.0;
-      else if (type == 'sawtooth')
-        sample = 2 * ((i / cycle) - (i / cycle).floor() - 0.5);
-
-      int intSample = ((sample * amp + 1.0) * 127.5).toInt();
-      pcmData.add(intSample.clamp(0, 255));
-    }
-
-    return _finalizeWav(pcmData, sampleRate);
-  }
-
-  // Adds the WAV Header to raw PCM data
-  static Uint8List _finalizeWav(List<int> pcmData, int sampleRate) {
-    final int fileSize = 36 + pcmData.length;
-    final ByteData header = ByteData(44);
-
-    header.setUint8(0, 0x52);
-    header.setUint8(1, 0x49);
-    header.setUint8(2, 0x46);
-    header.setUint8(3, 0x46); // RIFF
-    header.setUint32(4, fileSize, Endian.little);
-    header.setUint8(8, 0x57);
-    header.setUint8(9, 0x41);
-    header.setUint8(10, 0x56);
-    header.setUint8(11, 0x45); // WAVE
-    header.setUint8(12, 0x66);
-    header.setUint8(13, 0x6D);
-    header.setUint8(14, 0x74);
-    header.setUint8(15, 0x20); // fmt
-    header.setUint32(16, 16, Endian.little);
-    header.setUint16(20, 1, Endian.little);
-    header.setUint16(22, 1, Endian.little);
-    header.setUint32(24, sampleRate, Endian.little);
-    header.setUint32(28, sampleRate, Endian.little);
-    header.setUint16(32, 1, Endian.little);
-    header.setUint16(34, 8, Endian.little);
-    header.setUint8(36, 0x64);
-    header.setUint8(37, 0x61);
-    header.setUint8(38, 0x74);
-    header.setUint8(39, 0x61); // data
-    header.setUint32(40, pcmData.length, Endian.little);
-
-    return Uint8List.fromList(header.buffer.asUint8List() + pcmData);
   }
 }
