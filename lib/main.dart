@@ -696,268 +696,279 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           border: Border.all(width: 4, color: const Color(0xFFD69736)),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              "FLAPPY MATH",
-              style: GoogleFonts.vt323(
-                fontSize: 50,
-                color: const Color(0xFFF47E1B),
-                shadows: [const Shadow(offset: Offset(2, 2))],
-              ),
-            ),
-            Text(
-              "Educational Edition",
-              style: GoogleFonts.nunito(
-                fontSize: 14,
-                color: const Color(0xFFD69736),
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                IconButton(
-                  icon: const Icon(LucideIcons.chevronLeft),
-                  onPressed: () => setState(
-                    () => _character =
-                        CharacterType.values[(_character.index - 1) % 3],
-                  ),
-                ),
-                SizedBox(
-                  width: 60,
-                  height: 50,
-                  child: Stack(
+                child: SingleChildScrollView(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Positioned(
-                        top: 15,
-                        left: 15,
-                        child: BirdWidget(rotation: 0, type: _character, gameConfig: _gameConfig),
+                      Text(
+                        "FLAPPY MATH",
+                        style: GoogleFonts.vt323(
+                          fontSize: 50,
+                          color: const Color(0xFFF47E1B),
+                          shadows: [const Shadow(offset: Offset(2, 2))],
+                        ),
+                      ),
+                      Text(
+                        "Educational Edition",
+                        style: GoogleFonts.nunito(
+                          fontSize: 14,
+                          color: const Color(0xFFD69736),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          IconButton(
+                            icon: const Icon(LucideIcons.chevronLeft),
+                            onPressed: () => setState(
+                              () => _character =
+                                  CharacterType.values[(_character.index - 1) % 3],
+                            ),
+                          ),
+                          SizedBox(
+                            width: 60,
+                            height: 50,
+                            child: Stack(
+                              children: [
+                                Positioned(
+                                  top: 15,
+                                  left: 15,
+                                  child: BirdWidget(
+                                      rotation: 0,
+                                      type: _character,
+                                      gameConfig: _gameConfig),
+                                ),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(LucideIcons.chevronRight),
+                            onPressed: () => setState(
+                              () => _character =
+                                  CharacterType.values[(_character.index + 1) % 3],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      Container(
+                        padding:
+                            const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFE8DCB0),
+                          border: Border.all(color: const Color(0xFFD69736)),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                AudioService.isMuted()
+                                    ? LucideIcons.volumeX
+                                    : LucideIcons.volume2,
+                                color: const Color(0xFFF47E1B),
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                AudioService.isMuted() ? "AUDIO: OFF" : "AUDIO: ON",
+                                style: GoogleFonts.vt323(
+                                  fontSize: 18,
+                                  color: const Color(0xFFF47E1B),
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Row(
+                                children: [
+                                  GestureDetector(
+                                    onTap: () => setState(() {
+                                      if (AudioService.isMuted()) {
+                                        AudioService.toggleMute();
+                                      }
+                                    }),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: !AudioService.isMuted()
+                                            ? const Color(0xFFF47E1B)
+                                            : Colors.transparent,
+                                        border: !AudioService.isMuted()
+                                            ? null
+                                            : Border.all(
+                                                color: const Color(0xFFD69736)),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        "ON",
+                                        style: GoogleFonts.vt323(
+                                          fontSize: 16,
+                                          color: !AudioService.isMuted()
+                                              ? Colors.white
+                                              : const Color(0xFFD69736),
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  GestureDetector(
+                                    onTap: () => setState(() {
+                                      if (!AudioService.isMuted()) {
+                                        AudioService.toggleMute();
+                                      }
+                                    }),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: AudioService.isMuted()
+                                            ? const Color(0xFFF47E1B)
+                                            : Colors.transparent,
+                                        border: AudioService.isMuted()
+                                            ? null
+                                            : Border.all(
+                                                color: const Color(0xFFD69736)),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text(
+                                        "OFF",
+                                        style: GoogleFonts.vt323(
+                                          fontSize: 16,
+                                          color: AudioService.isMuted()
+                                              ? Colors.white
+                                              : const Color(0xFFD69736),
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _toggleBtn(
+                              "CLASSIC",
+                              _gameMode == GameMode.classic,
+                              () => setState(() {
+                                _gameMode = GameMode.classic;
+                                _gameConfig = getGameConfig(_gameMode);
+                              }),
+                            ),
+                          ),
+                          Expanded(
+                            child: _toggleBtn(
+                              "MATH",
+                              _gameMode == GameMode.math,
+                              () => setState(() {
+                                _gameMode = GameMode.math;
+                                _gameConfig = getGameConfig(_gameMode);
+                              }),
+                            ),
+                          ),
+                          Expanded(
+                            child: _toggleBtn(
+                              "SPELL",
+                              _gameMode == GameMode.spelling,
+                              () => setState(() {
+                                _gameMode = GameMode.spelling;
+                                _gameConfig = getGameConfig(_gameMode);
+                              }),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _toggleBtn(
+                              "EASY",
+                              _difficulty == Difficulty.easy,
+                              () => setState(() => _difficulty = Difficulty.easy),
+                              color: Colors.green,
+                            ),
+                          ),
+                          Expanded(
+                            child: _toggleBtn(
+                              "MED",
+                              _difficulty == Difficulty.medium,
+                              () => setState(() => _difficulty = Difficulty.medium),
+                              color: Colors.amber,
+                            ),
+                          ),
+                          Expanded(
+                            child: _toggleBtn(
+                              "HARD",
+                              _difficulty == Difficulty.hard,
+                              () => setState(() => _difficulty = Difficulty.hard),
+                              color: Colors.red,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF1CB6CF),
+                                padding: const EdgeInsets.all(12),
+                              ),
+                              onPressed: () => Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => const ScoresScreen(),
+                                ),
+                              ),
+                              icon: const Icon(LucideIcons.trophy, color: Colors.white),
+                              label: Text(
+                                "SCORES",
+                                style: GoogleFonts.vt323(
+                                  fontSize: 18,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF53C02C),
+                                padding: const EdgeInsets.all(16),
+                              ),
+                              onPressed: _startGame,
+                              icon: const Icon(LucideIcons.play, color: Colors.white),
+                              label: Text(
+                                "PLAY",
+                                style: GoogleFonts.vt323(
+                                  fontSize: 24,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
-                IconButton(
-                  icon: const Icon(LucideIcons.chevronRight),
-                  onPressed: () => setState(
-                    () => _character =
-                        CharacterType.values[(_character.index + 1) % 3],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFE8DCB0),
-                border: Border.all(color: const Color(0xFFD69736)),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    AudioService.isMuted()
-                        ? LucideIcons.volumeX
-                        : LucideIcons.volume2,
-                    color: const Color(0xFFF47E1B),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    AudioService.isMuted() ? "AUDIO: OFF" : "AUDIO: ON",
-                    style: GoogleFonts.vt323(
-                      fontSize: 18,
-                      color: const Color(0xFFF47E1B),
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Row(
-                    children: [
-                      GestureDetector(
-                        onTap: () => setState(() {
-                          if (AudioService.isMuted()) {
-                            AudioService.toggleMute();
-                          }
-                        }),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: !AudioService.isMuted()
-                                ? const Color(0xFFF47E1B)
-                                : Colors.transparent,
-                            border: !AudioService.isMuted()
-                                ? null
-                                : Border.all(color: const Color(0xFFD69736)),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            "ON",
-                            style: GoogleFonts.vt323(
-                              fontSize: 16,
-                              color: !AudioService.isMuted()
-                                  ? Colors.white
-                                  : const Color(0xFFD69736),
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      GestureDetector(
-                        onTap: () => setState(() {
-                          if (!AudioService.isMuted()) {
-                            AudioService.toggleMute();
-                          }
-                        }),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AudioService.isMuted()
-                                ? const Color(0xFFF47E1B)
-                                : Colors.transparent,
-                            border: AudioService.isMuted()
-                                ? null
-                                : Border.all(color: const Color(0xFFD69736)),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: Text(
-                            "OFF",
-                            style: GoogleFonts.vt323(
-                              fontSize: 16,
-                              color: AudioService.isMuted()
-                                  ? Colors.white
-                                  : const Color(0xFFD69736),
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: _toggleBtn(
-                    "CLASSIC",
-                    _gameMode == GameMode.classic,
-                    () => setState(() {
-                      _gameMode = GameMode.classic;
-                      _gameConfig = getGameConfig(_gameMode);
-                    }),
-                  ),
-                ),
-                Expanded(
-                  child: _toggleBtn(
-                    "MATH",
-                    _gameMode == GameMode.math,
-                    () => setState(() {
-                      _gameMode = GameMode.math;
-                      _gameConfig = getGameConfig(_gameMode);
-                    }),
-                  ),
-                ),
-                Expanded(
-                  child: _toggleBtn(
-                    "SPELL",
-                    _gameMode == GameMode.spelling,
-                    () => setState(() {
-                      _gameMode = GameMode.spelling;
-                      _gameConfig = getGameConfig(_gameMode);
-                    }),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                Expanded(
-                  child: _toggleBtn(
-                    "EASY",
-                    _difficulty == Difficulty.easy,
-                    () => setState(() => _difficulty = Difficulty.easy),
-                    color: Colors.green,
-                  ),
-                ),
-                Expanded(
-                  child: _toggleBtn(
-                    "MED",
-                    _difficulty == Difficulty.medium,
-                    () => setState(() => _difficulty = Difficulty.medium),
-                    color: Colors.amber,
-                  ),
-                ),
-                Expanded(
-                  child: _toggleBtn(
-                    "HARD",
-                    _difficulty == Difficulty.hard,
-                    () => setState(() => _difficulty = Difficulty.hard),
-                    color: Colors.red,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF1CB6CF),
-                      padding: const EdgeInsets.all(12),
-                    ),
-                    onPressed: () => Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const ScoresScreen(),
-                      ),
-                    ),
-                    icon: const Icon(LucideIcons.trophy, color: Colors.white),
-                    label: Text(
-                      "SCORES",
-                      style: GoogleFonts.vt323(
-                        fontSize: 18,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF53C02C),
-                      padding: const EdgeInsets.all(16),
-                    ),
-                    onPressed: _startGame,
-                    icon: const Icon(LucideIcons.play, color: Colors.white),
-                    label: Text(
-                      "PLAY",
-                      style: GoogleFonts.vt323(
-                        fontSize: 24,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }
