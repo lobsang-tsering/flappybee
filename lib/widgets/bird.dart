@@ -1,3 +1,4 @@
+import 'package:flappybee/game_config.dart';
 import 'package:flutter/material.dart';
 import '../constants.dart';
 import '../types.dart';
@@ -5,16 +6,17 @@ import '../types.dart';
 class BirdWidget extends StatelessWidget {
   final double rotation;
   final CharacterType type;
+  final GameConfig gameConfig;
 
-  const BirdWidget({super.key, required this.rotation, required this.type});
+  const BirdWidget({super.key, required this.rotation, required this.type, required this.gameConfig});
 
   @override
   Widget build(BuildContext context) {
     return Transform.rotate(
       angle: rotation * (pi / 180),
       child: SizedBox(
-        width: kBirdSize,
-        height: kBirdSize * 0.75,
+        width: gameConfig.birdSize,
+        height: gameConfig.birdSize * 0.75,
         child: _buildSkin(),
       ),
     );

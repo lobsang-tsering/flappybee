@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 
 import 'constants.dart';
+import 'game_config.dart';
 import 'types.dart';
 import 'services/question_service.dart';
 import 'services/audio_service.dart';
@@ -49,6 +50,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   GameMode _gameMode = GameMode.math;
   Difficulty _difficulty = Difficulty.easy;
   CharacterType _character = CharacterType.bird;
+  late GameConfig _gameConfig;
 
   // Physics
   late Ticker _ticker;
@@ -72,6 +74,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    _gameConfig = getGameConfig(_gameMode);
     _initializeServices().then((_) {
       if (mounted) {
         setState(() {});
@@ -95,6 +98,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   void _resetGame() {
     QuestionService.configure(_gameMode, _difficulty);
+    _gameConfig = getGameConfig(_gameMode);
     setState(() {
       _birdY = _gameHeight / 2;
       _birdVelocity = 0;
@@ -111,9 +115,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   void _startGame() {
     QuestionService.configure(_gameMode, _difficulty);
+    _gameConfig = getGameConfig(_gameMode);
     setState(() {
       _gameState = GameState.playing;
-      _birdVelocity = kJumpStrength;
+      _birdVelocity = _gameConfig.jumpStrength;
       _birdY = _gameHeight / 2;
       _pipes.clear();
       _score = 0;
@@ -124,7 +129,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   void _jump() {
     if (_gameState == GameState.playing) {
-      _birdVelocity = kJumpStrength;
+      _birdVelocity = _gameConfig.jumpStrength;
       AudioService.playJump();
     } else if (_gameState == GameState.start) {
       _startGame();
@@ -223,16 +228,16 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
     const padding = 100.0;
     final safeHeight = _gameHeight - (padding * 2);
-    final obstacleContent = (kGapSize * 2) + 60;
+    final obstacleContent = (_gameConfig.gapSize * 2) + 60;
     final complexCenterY =
         padding +
         (obstacleContent / 2) +
         Random().nextDouble() * (safeHeight - obstacleContent);
 
-    final gapTop = complexCenterY - 30 - (kGapSize / 2);
-    final gapBottom = complexCenterY + 30 + (kGapSize / 2);
+    final gapTop = complexCenterY - 30 - (_gameConfig.gapSize / 2);
+    final gapBottom = complexCenterY + 30 + (_gameConfig.gapSize / 2);
 
-    final visibilityDelay = problem != null ? kQuestionDelayFrames : 0;
+    final visibilityDelay = problem != null ? _gameConfig.questionDelayFrames : 0;
 
     _pipes.add(
       PipeData(
@@ -254,12 +259,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     setState(() {
       const visualGroundHeight = 100.0;
       final groundY = _gameHeight - visualGroundHeight;
-      final groundLevel = groundY - (kBirdSize / 2) + 4;
+      final groundLevel = groundY - (_gameConfig.birdSize / 2) + 4;
       final onGround = _birdY >= groundLevel;
 
       if (_gameState == GameState.playing ||
           (_gameState == GameState.gameOver && !onGround)) {
-        _birdVelocity += kGravity;
+        _birdVelocity += _gameConfig.gravity;
         _birdY += _birdVelocity;
 
         if (_gameState == GameState.gameOver && _birdY > groundLevel) {
@@ -273,16 +278,16 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
       if (_gameState == GameState.playing) {
         _frames++;
-        if (_frames % kPipeSpawnRate == 0) _spawnPipe();
+        if (_frames % _gameConfig.pipeSpawnRate == 0) _spawnPipe();
 
         for (var pipe in _pipes) {
           if (pipe.visibilityDelay > 0) {
             pipe.visibilityDelay--;
           } else {
-            pipe.x -= kGameSpeed;
+            pipe.x -= _gameConfig.gameSpeed;
           }
         }
-        _pipes.removeWhere((p) => p.x < -kPipeWidth);
+        _pipes.removeWhere((p) => p.x < -_gameConfig.pipeWidth);
 
         const birdHitboxRadius = 12.0;
         final birdX = _gameWidth * 0.2;
@@ -295,14 +300,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
         for (var pipe in _pipes) {
           final pipeLeft = pipe.x;
-          final pipeRight = pipe.x + kPipeWidth;
+          final pipeRight = pipe.x + _gameConfig.pipeWidth;
 
           if ((birdX + birdHitboxRadius > pipeLeft) &&
               (birdX - birdHitboxRadius < pipeRight)) {
-            final topGapMin = pipe.gapTop - (kGapSize / 2);
-            final topGapMax = pipe.gapTop + (kGapSize / 2);
-            final bottomGapMin = pipe.gapBottom - (kGapSize / 2);
-            final bottomGapMax = pipe.gapBottom + (kGapSize / 2);
+            final topGapMin = pipe.gapTop - (_gameConfig.gapSize / 2);
+            final topGapMax = pipe.gapTop + (_gameConfig.gapSize / 2);
+            final bottomGapMin = pipe.gapBottom - (_gameConfig.gapSize / 2);
+            final bottomGapMax = pipe.gapBottom + (_gameConfig.gapSize / 2);
             final birdTop = _birdY - birdHitboxRadius;
             final birdBottom = _birdY + birdHitboxRadius;
 
@@ -319,14 +324,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         }
 
         for (var pipe in _pipes) {
-          if (!pipe.passed && pipe.x + kPipeWidth < birdX - birdHitboxRadius) {
+          if (!pipe.passed && pipe.x + _gameConfig.pipeWidth < birdX - birdHitboxRadius) {
             pipe.passed = true;
             bool correctAnswer = false;
             if (pipe.problem != null) {
-              final topGapMin = pipe.gapTop - (kGapSize / 2);
-              final topGapMax = pipe.gapTop + (kGapSize / 2);
-              final bottomGapMin = pipe.gapBottom - (kGapSize / 2);
-              final bottomGapMax = pipe.gapBottom + (kGapSize / 2);
+              final topGapMin = pipe.gapTop - (_gameConfig.gapSize / 2);
+              final topGapMax = pipe.gapTop + (_gameConfig.gapSize / 2);
+              final bottomGapMin = pipe.gapBottom - (_gameConfig.gapSize / 2);
+              final bottomGapMax = pipe.gapBottom + (_gameConfig.gapSize / 2);
               final birdTop = _birdY - birdHitboxRadius;
               final birdBottom = _birdY + birdHitboxRadius;
 
@@ -344,6 +349,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
             if (correctAnswer) {
               _score++;
+              if (_score % 5 == 0) {
+                _gameConfig.gameSpeed += 0.1;
+              }
               AudioService.playCoin();
               _spawnTextEffect(birdX, _birdY, "+1", Colors.amber);
             } else {
@@ -489,17 +497,18 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     ),
 
                     ..._pipes.map(
-                      (p) => ObstacleWidget(key: ValueKey(p.id), data: p),
+                      (p) => ObstacleWidget(key: ValueKey(p.id), data: p, gameConfig: _gameConfig),
                     ),
 
                     if (_gameState == GameState.playing ||
                         _gameState == GameState.gameOver)
                       Positioned(
-                        top: _birdY - (kBirdSize * 0.75 / 2),
-                        left: (_gameWidth * 0.2) - (kBirdSize / 2),
+                        top: _birdY - (_gameConfig.birdSize * 0.75 / 2),
+                        left: (_gameWidth * 0.2) - (_gameConfig.birdSize / 2),
                         child: BirdWidget(
                           rotation: _birdRotation,
                           type: _character,
+                          gameConfig: _gameConfig,
                         ),
                       ),
 
@@ -725,7 +734,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       Positioned(
                         top: 15,
                         left: 15,
-                        child: BirdWidget(rotation: 0, type: _character),
+                        child: BirdWidget(rotation: 0, type: _character, gameConfig: _gameConfig),
                       ),
                     ],
                   ),
@@ -845,21 +854,30 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   child: _toggleBtn(
                     "CLASSIC",
                     _gameMode == GameMode.classic,
-                    () => setState(() => _gameMode = GameMode.classic),
+                    () => setState(() {
+                      _gameMode = GameMode.classic;
+                      _gameConfig = getGameConfig(_gameMode);
+                    }),
                   ),
                 ),
                 Expanded(
                   child: _toggleBtn(
                     "MATH",
                     _gameMode == GameMode.math,
-                    () => setState(() => _gameMode = GameMode.math),
+                    () => setState(() {
+                      _gameMode = GameMode.math;
+                      _gameConfig = getGameConfig(_gameMode);
+                    }),
                   ),
                 ),
                 Expanded(
                   child: _toggleBtn(
                     "SPELL",
                     _gameMode == GameMode.spelling,
-                    () => setState(() => _gameMode = GameMode.spelling),
+                    () => setState(() {
+                      _gameMode = GameMode.spelling;
+                      _gameConfig = getGameConfig(_gameMode);
+                    }),
                   ),
                 ),
               ],

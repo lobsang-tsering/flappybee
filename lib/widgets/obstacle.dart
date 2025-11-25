@@ -1,3 +1,4 @@
+import 'package:flappybee/game_config.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../constants.dart';
@@ -5,8 +6,9 @@ import '../types.dart';
 
 class ObstacleWidget extends StatelessWidget {
   final PipeData data;
+  final GameConfig gameConfig;
 
-  const ObstacleWidget({super.key, required this.data});
+  const ObstacleWidget({super.key, required this.data, required this.gameConfig});
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +36,7 @@ class ObstacleWidget extends StatelessWidget {
       return const SizedBox.shrink();
     }
 
-    final halfGap = kGapSize / 2;
+    final halfGap = gameConfig.gapSize / 2;
     final block1Height = data.gapTop - halfGap;
     final block2Top = data.gapTop + halfGap;
     final block2Height = (data.gapBottom - halfGap) - block2Top;
@@ -44,7 +46,7 @@ class ObstacleWidget extends StatelessWidget {
       left: data.x,
       top: 0,
       bottom: 0,
-      width: kPipeWidth,
+      width: gameConfig.pipeWidth,
       child: Stack(
         children: [
           // Top Pipe
