@@ -10,6 +10,7 @@ class GameConfig {
   final double gapSize;
   final double blockSize;
   final int questionDelayFrames;
+  final double speedIncreaseRate;
 
   GameConfig({
     required this.gameSpeed,
@@ -21,6 +22,7 @@ class GameConfig {
     required this.gapSize,
     required this.blockSize,
     required this.questionDelayFrames,
+    required this.speedIncreaseRate,
   });
 }
 
@@ -34,6 +36,7 @@ GameConfig classicConfig = GameConfig(
   gapSize: 150.0,
   blockSize: 60.0,
   questionDelayFrames: 0,
+  speedIncreaseRate: 0.2,
 );
 
 GameConfig mathConfig = GameConfig(
@@ -46,6 +49,7 @@ GameConfig mathConfig = GameConfig(
   gapSize: 150.0,
   blockSize: 60.0,
   questionDelayFrames: 120,
+  speedIncreaseRate: 0.2,
 );
 
 GameConfig spellingConfig = GameConfig(
@@ -58,6 +62,7 @@ GameConfig spellingConfig = GameConfig(
   gapSize: 200.0,
   blockSize: 60.0,
   questionDelayFrames: 120,
+  speedIncreaseRate: 0.2,
 );
 
 GameConfig getGameConfig(GameMode gameMode) {

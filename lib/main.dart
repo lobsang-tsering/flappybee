@@ -350,7 +350,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             if (correctAnswer) {
               _score++;
               if (_score % 5 == 0) {
-                _gameConfig.gameSpeed += 0.2;
+                _gameConfig.gameSpeed += _gameConfig.speedIncreaseRate;
               }
               AudioService.playCoin();
               _spawnTextEffect(birdX, _birdY, "+1", Colors.amber);
