@@ -11,9 +11,18 @@ import 'types.dart';
 import 'services/question_service.dart';
 import 'services/audio_service.dart';
 import 'services/score_service.dart';
+import 'services/lives_service.dart';
+import 'services/ad_service.dart';
+import 'services/ad_network_manager.dart';
+import 'services/ad_service_instance.dart';
 import 'screens/scores_screen.dart';
 import 'widgets/bird.dart';
 import 'widgets/obstacle.dart';
+import 'widgets/ad_button.dart';
+import 'package:flappybee/config/ad_network_config.dart';
+import 'package:flappybee/services/coin_service.dart';
+
+// Global ad service instance imported from ad_service_instance.dart
 
 void main() {
   runApp(const AbacusFlapApp());
@@ -45,6 +54,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   GameState _gameState = GameState.start;
   int _score = 0;
   int _highScore = 0;
+  int _totalCoins = 0;
+
+  // Lives System
+  int _currentLives = 5; // Default, will be updated after initialization
+  Timer? _recoveryTimer;
+  String? _recoveryTimeDisplay;
 
   // Settings
   GameMode _gameMode = GameMode.math;
@@ -66,6 +81,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   int _frames = 0;
   double _gameHeight = 0;
   double _gameWidth = 0;
+  bool _acceptingInput = true;
 
   // Spelling Mode State
   String _currentWord = "";
@@ -74,7 +90,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
-    _gameConfig = getGameConfig(_gameMode);
+    _gameConfig = getGameConfig(_gameMode, _difficulty);
     _initializeServices().then((_) {
       if (mounted) {
         setState(() {});
@@ -86,19 +102,46 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _initializeServices() async {
+    // Configure ad network (can be changed here)
+    AdNetworkConfig.configureAdNetwork();
+
     await AudioService.init();
-    ScoreService.initialize();
+    await ScoreService.initialize();
+    await LivesService.initialize();
+    await CoinService.initialize();
+    await adService.initialize();
+    // Update lives count after initialization
+    if (mounted) {
+      setState(() {
+        _currentLives = LivesService.getCurrentLives();
+        _totalCoins = CoinService.getCoins();
+      });
+    }
+    _startRecoveryTimer();
   }
 
   @override
   void dispose() {
     _ticker.dispose();
+    _recoveryTimer?.cancel();
     super.dispose();
+  }
+
+  void _startRecoveryTimer() {
+    _recoveryTimer?.cancel();
+    _recoveryTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (mounted) {
+        setState(() {
+          _currentLives = LivesService.getCurrentLives();
+          _recoveryTimeDisplay = LivesService.getRecoveryTimeFormatted();
+        });
+      }
+    });
   }
 
   void _resetGame() {
     QuestionService.configure(_gameMode, _difficulty);
-    _gameConfig = getGameConfig(_gameMode);
+    _gameConfig = getGameConfig(_gameMode, _difficulty);
     setState(() {
       _birdY = _gameHeight / 2;
       _birdVelocity = 0;
@@ -114,8 +157,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void _startGame() {
+    // Check if player has lives
+    if (!LivesService.hasLives()) {
+      return; // Don't start game if no lives
+    }
+
     QuestionService.configure(_gameMode, _difficulty);
-    _gameConfig = getGameConfig(_gameMode);
+    _gameConfig = getGameConfig(_gameMode, _difficulty);
     setState(() {
       _gameState = GameState.playing;
       _birdVelocity = _gameConfig.jumpStrength;
@@ -128,6 +176,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   void _jump() {
+    if (!_acceptingInput) return;
     if (_gameState == GameState.playing) {
       _birdVelocity = _gameConfig.jumpStrength;
       AudioService.playJump();
@@ -150,8 +199,29 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     _saveScore();
     _spawnExplosion(kMaxGameWidth * 0.2, _birdY);
 
-    setState(() {
-      _gameState = GameState.gameOver;
+    // Consume a life
+    LivesService.consumeLife().then((hasLives) {
+      if (mounted) {
+        setState(() {
+          _currentLives = LivesService.getCurrentLives();
+          if (hasLives) {
+            // Still have lives, reset game but keep playing
+            _resetGame();
+            _gameState = GameState.start;
+            _acceptingInput = false;
+            Timer(const Duration(seconds: 1), () {
+              if (mounted) {
+                setState(() {
+                  _acceptingInput = true;
+                });
+              }
+            });
+          } else {
+            // No lives left, show game over screen
+            _gameState = GameState.gameOver;
+          }
+        });
+      }
     });
   }
 
@@ -349,6 +419,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
             if (correctAnswer) {
               _score++;
+              CoinService.addCoins(1);
+              setState(() {
+                _totalCoins = CoinService.getCoins();
+              });
               if (_score % 5 == 0) {
                 _gameConfig.gameSpeed += _gameConfig.speedIncreaseRate;
               }
@@ -627,7 +701,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               maxLines: 1,
             ),
             const SizedBox(height: 8),
-            Row(mainAxisSize: MainAxisSize.min, children: chars),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 2.0,
+              runSpacing: 4.0,
+              children: chars,
+            ),
           ],
         );
         hasQuestion = true;
@@ -644,13 +723,36 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              "$_score",
-              style: GoogleFonts.vt323(
-                fontSize: 60,
-                color: Colors.white,
-                shadows: [const Shadow(offset: Offset(3, 3))],
-              ),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  "$_score",
+                  style: GoogleFonts.vt323(
+                    fontSize: 60,
+                    color: Colors.white,
+                    shadows: [const Shadow(offset: Offset(3, 3))],
+                  ),
+                ),
+                Row(
+                  children: [
+                    const Icon(
+                      LucideIcons.heart,
+                      color: Colors.red,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      "$_currentLives",
+                      style: GoogleFonts.vt323(
+                        fontSize: 24,
+                        color: Colors.white,
+                        shadows: [const Shadow(offset: Offset(2, 2))],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
             if (_gameState == GameState.playing && hasQuestion)
               Expanded(
@@ -678,6 +780,24 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   ),
                 ),
               ),
+            Row(
+              children: [
+                const Icon(
+                  LucideIcons.coins,
+                  color: Colors.amber,
+                  size: 20,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  "$_totalCoins",
+                  style: GoogleFonts.vt323(
+                    fontSize: 24,
+                    color: Colors.white,
+                    shadows: [const Shadow(offset: Offset(2, 2))],
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
@@ -716,7 +836,23 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(height: 10),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Icon(LucideIcons.coins, color: Colors.amber),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Total Coins: $_totalCoins',
+                            style: GoogleFonts.vt323(
+                              fontSize: 24,
+                              color: const Color(0xFFF47E1B),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
                       Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
@@ -866,7 +1002,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                               _gameMode == GameMode.classic,
                               () => setState(() {
                                 _gameMode = GameMode.classic;
-                                _gameConfig = getGameConfig(_gameMode);
+                                _gameConfig = getGameConfig(_gameMode, _difficulty);
                               }),
                             ),
                           ),
@@ -876,7 +1012,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                               _gameMode == GameMode.math,
                               () => setState(() {
                                 _gameMode = GameMode.math;
-                                _gameConfig = getGameConfig(_gameMode);
+                                _gameConfig = getGameConfig(_gameMode, _difficulty);
                               }),
                             ),
                           ),
@@ -886,7 +1022,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                               _gameMode == GameMode.spelling,
                               () => setState(() {
                                 _gameMode = GameMode.spelling;
-                                _gameConfig = getGameConfig(_gameMode);
+                                _gameConfig = getGameConfig(_gameMode, _difficulty);
                               }),
                             ),
                           ),
@@ -899,7 +1035,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                             child: _toggleBtn(
                               "EASY",
                               _difficulty == Difficulty.easy,
-                              () => setState(() => _difficulty = Difficulty.easy),
+                              () => setState(() {
+                                _difficulty = Difficulty.easy;
+                                _gameConfig = getGameConfig(_gameMode, _difficulty);
+                              }),
                               color: Colors.green,
                             ),
                           ),
@@ -907,7 +1046,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                             child: _toggleBtn(
                               "MED",
                               _difficulty == Difficulty.medium,
-                              () => setState(() => _difficulty = Difficulty.medium),
+                              () => setState(() {
+                                _difficulty = Difficulty.medium;
+                                _gameConfig = getGameConfig(_gameMode, _difficulty);
+                              }),
                               color: Colors.amber,
                             ),
                           ),
@@ -915,13 +1057,37 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                             child: _toggleBtn(
                               "HARD",
                               _difficulty == Difficulty.hard,
-                              () => setState(() => _difficulty = Difficulty.hard),
+                              () => setState(() {
+                                _difficulty = Difficulty.hard;
+                                _gameConfig = getGameConfig(_gameMode, _difficulty);
+                              }),
                               color: Colors.red,
                             ),
                           ),
                         ],
                       ),
                       const SizedBox(height: 20),
+                      // Ad button for extra lives
+                      if (_currentLives < 5) ...[
+                          Container(
+                            margin: const EdgeInsets.only(bottom: 16),
+                            child: AdButton(
+                              rewardType: RewardType.extraLife,
+                              rewardAmount: 1,
+                              customTitle: 'Free Extra Life',
+                              customSubtitle: 'Watch ad for 1 extra life',
+                              onRewardEarned: () async {
+                                await LivesService.addLives(1);
+                                if (mounted) {
+                                  setState(() {
+                                    _currentLives = LivesService.getCurrentLives();
+                                  });
+                                }
+                              },
+                              showFrequencyInfo: true,
+                            ),
+                          ),
+                      ],
                       Row(
                         children: [
                           Expanded(
@@ -948,21 +1114,51 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                           ),
                           const SizedBox(width: 8),
                           Expanded(
-                            child: ElevatedButton.icon(
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF53C02C),
-                                padding: const EdgeInsets.all(16),
-                              ),
-                              onPressed: _startGame,
-                              icon: const Icon(LucideIcons.play, color: Colors.white),
-                              label: Text(
-                                "PLAY",
-                                style: GoogleFonts.vt323(
-                                  fontSize: 24,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
+                            child: _currentLives > 0
+                                ? ElevatedButton.icon(
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: _acceptingInput ? const Color(0xFF53C02C) : Colors.grey,
+                                      padding: const EdgeInsets.all(16),
+                                    ),
+                                    onPressed: _acceptingInput ? _startGame : null,
+                                    icon: const Icon(LucideIcons.play, color: Colors.white),
+                                    label: Text(
+                                      "PLAY",
+                                      style: GoogleFonts.vt323(
+                                        fontSize: 24,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                  )
+                                : Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFFE8DCB0),
+                                      border: Border.all(color: const Color(0xFFD69736)),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        Text(
+                                          "LIVES RECOVER IN",
+                                          style: GoogleFonts.nunito(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.bold,
+                                            color: const Color(0xFFF47E1B),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          _recoveryTimeDisplay ?? "5:00",
+                                          style: GoogleFonts.vt323(
+                                            fontSize: 24,
+                                            color: const Color(0xFFF47E1B),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
                           ),
                         ],
                       ),
@@ -1002,11 +1198,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   Widget _buildGameOverScreen() {
+    final hasLives = LivesService.hasLives();
+
     return Container(
       color: Colors.black54,
       alignment: Alignment.center,
       child: Container(
-        width: 300,
+        width: 320,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: const Color(0xFFFCF8DC),
@@ -1017,7 +1215,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              "GAME OVER",
+              hasLives ? "OUT OF LIVES!" : "GAME OVER",
               style: GoogleFonts.vt323(
                 fontSize: 50,
                 color: const Color(0xFFF47E1B),
@@ -1025,6 +1223,35 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               ),
             ),
             const SizedBox(height: 20),
+            if (!hasLives && _recoveryTimeDisplay != null) ...[
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8DCB0),
+                  border: Border.all(color: const Color(0xFFD69736)),
+                ),
+                child: Column(
+                  children: [
+                    Text(
+                      "LIVES RECOVER IN",
+                      style: GoogleFonts.nunito(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _recoveryTimeDisplay!,
+                      style: GoogleFonts.vt323(
+                        fontSize: 36,
+                        color: const Color(0xFFF47E1B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
@@ -1076,19 +1303,45 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               ),
             ),
             const SizedBox(height: 20),
+            // Ad button for continue game
+            Container(
+              margin: const EdgeInsets.only(bottom: 16),
+              child: AdButton(
+                rewardType: RewardType.continueGame,
+                rewardAmount: 1,
+                customTitle: 'Continue Playing',
+                customSubtitle: 'Watch ad to continue this game',
+                onRewardEarned: () {
+                  // Continue the current game session
+                  setState(() {
+                    _gameState = GameState.playing;
+                    // Reset bird position and physics
+                    _birdY = _gameHeight / 2;
+                    _birdVelocity = 0;
+                    _birdRotation = 0;
+                    // Clear pipes and effects
+                    _pipes.clear();
+                    _effects.clear();
+                    _frames = 0;
+                  });
+                  if (!_ticker.isTicking) _ticker.start();
+                },
+                showFrequencyInfo: false,
+              ),
+            ),
             Row(
               children: [
                 Expanded(
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF53C02C),
+                      backgroundColor: hasLives ? const Color(0xFF53C02C) : Colors.grey,
                     ),
-                    onPressed: () {
+                    onPressed: hasLives ? () {
                       setState(() => _gameState = GameState.playing);
                       _startGame();
-                    },
+                    } : null,
                     child: Text(
-                      "RETRY",
+                      hasLives ? "CONTINUE" : "WAIT",
                       style: GoogleFonts.vt323(
                         fontSize: 20,
                         color: Colors.white,
